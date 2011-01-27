@@ -15,6 +15,9 @@ the lisence is kept free.
 @version: 0.0.1
 """
 
+import sys
+import os
+import re
 
 from statlib import stats
 from Bio import SeqIO
@@ -45,7 +48,7 @@ def count_fasta(fastaFile) :
 
 
 
-def length_distribution(fastaFile, sort = False) :
+def count_lengths(fastaFile, sort = False) :
   """Return a list with the lengths of the sequences.
 
   """
@@ -57,10 +60,14 @@ def length_distribution(fastaFile, sort = False) :
   return dist
 
 
-def print_length_distribution(fastaFile, sort = False) :
-  """Return a list with the lengths of the sequences.
+
+def print_lengths(fastaFile, sort = False) :
+  """Print a list with the lengths of the sequences.
 
   """
+  print 'length'
+  for seqLen in count_lengths(fastaFile, sort) :
+    print str(seqLen)
 
 
 
@@ -68,10 +75,7 @@ def count_nucleotides(fastaFile) :
   """Return the number of bases the file contains.
 
   """
-  nucs = 0
-  for length in length_distribution(fastaFile) :
-    nucs = nucs + length
-  return nucs
+  return stats.lsum(count_lengths(fastaFile))
 
 
 
@@ -91,14 +95,14 @@ def print_histogram(fastaFile, bins = 10) :
 
   """
   #Compute the bin centres
-  hist = get_length_histogram(fastaFile, bins)
+  hist = length_histogram(fastaFile, bins)
   binCentres = []
   for i in xrange(bins) :
     binCentres.append((i + 1) * hist[2] + hist[1])
   freqs = hist[0]
-  print "Length\tFreq"
+  print 'Length:\tFreq'
   for i in xrange(len(freqs)) :
-    print "%i\t%i\n" % (int(binCentres[i]), freqs[i])
+    print ' %s:\t%s' % (comma_me(str(int(binCentres[i]))), comma_me(str(freqs[i])))
 
 
 
@@ -108,7 +112,8 @@ def calculate_N50(fastaFile) :
   """
   halfLenTotal = count_nucleotides(fastaFile) / 2.0
   currentLen = 0
-  for length in length_distribution(fastaFile, sort = True) :
+  n50 = 0
+  for length in count_lengths(fastaFile, sort = True) :
     currentLen = currentLen + length
     if currentLen >= halfLenTotal :
       n50 = length
@@ -117,13 +122,64 @@ def calculate_N50(fastaFile) :
 
 
 
-if __name__ == "__main__" :
+def mean_sd_median_lengths(fastxFile) :
+  """Return some discriptive statistics of the sequence lengths.
 
-  #TODO Make the module a callable script for generic Fasta/q statistics.
-  # Run the module as a script.
-  import argparse
-  import sys
-  import shlex
-  parser = argparse.ArgumentParser(description='Calculate some Fasta/q statistics.')
-  parser.add_argument('-c', '--count',  )
+  Mean, SD, Median, Coefficient of variation.
+  """
+  lengths = count_lengths(fastxFile)
+  mean = stats.lmean(lengths)
+  sd = stats.stdev(lengths)
+  median = stats.medianscore(lengths)
+  coefVar = stats.variation(lengths)
+  return (mean, sd, median, coefVar)
+
+
+
+def min_max_lengths(fastxFile) :
+  """Return the min and max of the sequence lengths.
+
+  """
+  lengths = count_lengths(fastxFile, sort = True)
+  return (lengths[-1], lengths[0])
+
+
+
+def comma_me(amount):
+  """Taken from:
+  http://code.activestate.com/recipes/146461-commafying-an-integer/
+  """
+  orig = amount
+  new = re.sub("^(-?\d+)(\d{3})", '\g<1>,\g<2>', amount)
+  if orig == new:
+    return new
+  else:
+    return comma_me(new)
+
+
+
+if __name__ == "__main__" :
+  if len(sys.argv) > 1 :
+    fastxFile = sys.argv[1]
+  else :
+    sys.exit('Usage: ' + os.path.split(sys.argv[0])[1] + ' <fasta/q_file>\n\nProvide a Fasta/q sequence file.')
+  if len(sys.argv) > 2 :
+    tp = sys.argv[2]
+  else :
+    tp = 'fasta'
+
+  print '\nFile ' + fastxFile + ' has the following statistics:'
+  print 'Number of sequences         : %s' % comma_me(str(count_fasta(fastxFile)))
+  print 'Number of nucleotides       : %s' % comma_me(str(count_nucleotides(fastxFile)))
+  mn, mx = min_max_lengths(fastxFile)
+  print 'Longest Sequence            : %s' % comma_me(str(mx))
+  print 'Shortest Sequence           : %s' % comma_me(str(mn))
+  mean, sd, median, cv = mean_sd_median_lengths(fastxFile)
+  print 'Mean sequence length        : %.2f' % mean
+  print 'STDV sequence length        : %.2f' % sd
+  print 'Median sequence length      : %s' % comma_me(str(median))
+  print 'Variation of sequence length: %.2f' % cv
+  print 'N50 of the current file     : %s' % comma_me(str(calculate_N50(fastxFile)))
+  print 'Sequence length histogram:'
+  print_histogram(fastxFile)
 
