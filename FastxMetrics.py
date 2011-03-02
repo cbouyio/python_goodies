@@ -16,7 +16,6 @@ the lisence is kept free.
 """
 
 import sys
-import os
 import re
 
 from statlib import stats
@@ -79,8 +78,8 @@ def count_nucleotides(fastaFile) :
 
 
 
-def length_histogram(fastaFile, bins = 10) :
-  """Return the length frequencies in 10 bins.
+def length_histogram(fastaFile, bins) :
+  """Return the length frequencies in bins.
 
   """
   lengthsList = []
@@ -90,19 +89,25 @@ def length_histogram(fastaFile, bins = 10) :
 
 
 
-def print_histogram(fastaFile, bins = 10) :
+def print_histogram(fastaFile, bins) :
   """Return a "pretty" print out of the histogram.
 
   """
   #Compute the bin centres
   hist = length_histogram(fastaFile, bins)
-  binCentres = []
+  binRanges = []
   for i in xrange(bins) :
-    binCentres.append((i + 1) * hist[2] + hist[1])
+    binRange = [int(round(hist[1] + i * hist[2], 0)), int(round(hist[1] + (i + 1) * hist[2], 0))]
+    binRanges.append(binRange)
   freqs = hist[0]
-  print 'Length:\tFreq'
+  maxDigits1 = 2 * len(comma_me(str(binRanges[-1][-1]))) + 2
+  maxDigits2 = len(comma_me(str(freqs[-1]))) + 2
+  print 'Length'.center(maxDigits1), ':', 'Frequency'.center(maxDigits2)
   for i in xrange(len(freqs)) :
-    print ' %s:\t%s' % (comma_me(str(int(binCentres[i]))), comma_me(str(freqs[i])))
+    binStr = '%s-%s' % (comma_me(str(binRanges[i][0])), comma_me(str(binRanges[i][1])))
+    freqStr = comma_me(str(freqs[i]))
+    print binStr.rjust(maxDigits1), ':', freqStr.ljust(maxDigits2)
+
 
 
 
@@ -159,27 +164,32 @@ def comma_me(amount):
 
 
 if __name__ == "__main__" :
+  import argparse
+
+  parser = argparse.ArgumentParser(description='Python script (and module) to calculate a series of statistics related to sequences contained in a Fasta/q file.')
+  parser.add_argument('-b', '--bins', type=int, metavar = '<no_of_bins>', help = 'The number of bins for the calculation of the histogram. Default = 10', default = 10, dest = 'bins')
+  parser.add_argument('-t', '--type', type=str, metavar = '<type_of_file>', help = 'Designatethe type of the Fasta/q file. Default = "fasta"', default = 'fasta', dest = 'tp')
+  parser.add_argument('fasta/q', type=str, metavar = '<fasta/q_file>', help = 'The Fasta/q input file.(compulsory)')
+
+  ns = parser.parse_args()
+  bins = ns.bins
+  tp = ns.tp
+
   if len(sys.argv) > 1 :
     fastxFile = sys.argv[1]
-  else :
-    sys.exit('Usage: ' + os.path.split(sys.argv[0])[1] + ' <fasta/q_file>\n\nProvide a Fasta/q sequence file.')
-  if len(sys.argv) > 2 :
-    tp = sys.argv[2]
-  else :
-    tp = 'fasta'
 
-  print '\nFile ' + fastxFile + ' has the following statistics:'
-  print 'Number of sequences         : %s' % comma_me(str(count_fasta(fastxFile)))
-  print 'Number of nucleotides       : %s' % comma_me(str(count_nucleotides(fastxFile)))
+  print '-File ' + fastxFile + ' has the following statistics:'
+  print 'Number of sequences          : %s' % comma_me(str(count_fasta(fastxFile)))
+  print 'Number of nucleotides        : %s' % comma_me(str(count_nucleotides(fastxFile)))
   mn, mx = min_max_lengths(fastxFile)
-  print 'Longest Sequence            : %s' % comma_me(str(mx))
-  print 'Shortest Sequence           : %s' % comma_me(str(mn))
+  print 'Longest Sequence             : %s' % comma_me(str(mx))
+  print 'Shortest Sequence            : %s' % comma_me(str(mn))
   mean, sd, median, cv = mean_sd_median_lengths(fastxFile)
-  print 'Mean sequence length        : %.2f' % mean
-  print 'STDV sequence length        : %.2f' % sd
-  print 'Median sequence length      : %s' % comma_me(str(median))
-  print 'Variation of sequence length: %.2f' % cv
-  print 'N50 of the current file     : %s' % comma_me(str(calculate_N50(fastxFile)))
-  print 'Sequence length histogram:'
-  print_histogram(fastxFile)
+  print 'Mean sequence length         : %.2f' % mean
+  print 'STDV sequence length         : %.2f' % sd
+  print 'Median sequence length       : %s' % comma_me(str(median))
+  print 'Variation of sequence length : %.2f' % cv
+  print 'N50 of the current file      : %s' % comma_me(str(calculate_N50(fastxFile)))
+  print 'Sequence length histogram!'
+  print_histogram(fastxFile, bins)
 
