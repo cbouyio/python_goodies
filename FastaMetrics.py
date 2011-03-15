@@ -115,6 +115,7 @@ def calculate_N50(fastaFile) :
   """Return the N50 of a fasta file.
 
   """
+  #TODO Include a reference file as an option for the calculation of the N50.
   halfLenTotal = count_nucleotides(fastaFile) / 2.0
   currentLen = 0
   n50 = 0
