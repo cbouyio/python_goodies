@@ -2,7 +2,9 @@
 
 
 """
-A collection of usefull functions for fasta/q file.
+A collection of usefull functions to report statistics of for fasta files.
+
+Works as a script if it is called by its name.
 
 @author: Costas Bouyioukos
 @organization: The Sainsbury Laboratory
@@ -24,7 +26,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 
-def parse_fastx(fastaFile, typ = "fasta") :
+def parse_fasta(fastaFile, typ = "fasta") :
   """Low level function to return a list of sequence record objects.
 
   This is the primitive function that all the rest of the functions in that
@@ -43,7 +45,7 @@ def count_fasta(fastaFile) :
   """Return the number of sequences a fasta file contains.
 
   """
-  return len(parse_fastx(fastaFile))
+  return len(parse_fasta(fastaFile))
 
 
 
@@ -52,7 +54,7 @@ def count_lengths(fastaFile, sort = False) :
 
   """
   dist = []
-  for seqRec in parse_fastx(fastaFile) :
+  for seqRec in parse_fasta(fastaFile) :
     dist.append(len(seqRec))
   if sort :
     dist.sort(reverse = True)
@@ -83,7 +85,7 @@ def length_histogram(fastaFile, bins) :
 
   """
   lengthsList = []
-  for seqRec in parse_fastx(fastaFile) :
+  for seqRec in parse_fasta(fastaFile) :
     lengthsList.append(len(seqRec))
   return stats.lhistogram(lengthsList, bins)
 
@@ -98,6 +100,8 @@ def print_histogram(fastaFile, bins) :
   binRanges = []
   for i in xrange(bins) :
     binRange = [int(round(hist[1] + i * hist[2], 0)), int(round(hist[1] + (i + 1) * hist[2], 0))]
+    if binRange[0] < 0.0 :
+      binRange[0] = 0
     binRanges.append(binRange)
   freqs = hist[0]
   maxDigits1 = 2 * len(comma_me(str(binRanges[-1][-1]))) + 2
@@ -128,12 +132,12 @@ def calculate_N50(fastaFile) :
 
 
 
-def mean_sd_median_lengths(fastxFile) :
+def mean_sd_median_lengths(fastaFile) :
   """Return some discriptive statistics of the sequence lengths.
 
   Mean, SD, Median, Coefficient of variation.
   """
-  lengths = count_lengths(fastxFile)
+  lengths = count_lengths(fastaFile)
   mean = stats.lmean(lengths)
   sd = stats.stdev(lengths)
   median = stats.medianscore(lengths)
@@ -142,12 +146,21 @@ def mean_sd_median_lengths(fastxFile) :
 
 
 
-def min_max_lengths(fastxFile) :
+def min_max_lengths(fastaFile) :
   """Return the min and max of the sequence lengths.
 
   """
-  lengths = count_lengths(fastxFile, sort = True)
+  lengths = count_lengths(fastaFile, sort = True)
   return (lengths[-1], lengths[0])
+
+
+
+def mode(fastaFile) :
+  """Return the mode (the most )
+  """
+  lengths = count_lengths(fastaFile)
+  md = stats.lmode(lengths)[1][-1]
+  return md
 
 
 
@@ -170,27 +183,28 @@ if __name__ == "__main__" :
   parser = argparse.ArgumentParser(description='Python script (and module) to calculate a series of statistics related to sequences contained in a Fasta/q file.')
   parser.add_argument('-b', '--bins', type=int, metavar = '<no_of_bins>', help = 'The number of bins for the calculation of the histogram. Default = 10', default = 10, dest = 'bins')
   parser.add_argument('-t', '--type', type=str, metavar = '<type_of_file>', help = 'Designatethe type of the Fasta/q file. Default = "fasta"', default = 'fasta', dest = 'tp')
-  parser.add_argument('fasta/q', type=str, metavar = '<fasta/q_file>', help = 'The Fasta/q input file.(compulsory)')
+  parser.add_argument('fasta', type=str, metavar = '<fasta_file>', help = 'The Fasta input file.(compulsory)')
 
   ns = parser.parse_args()
   bins = ns.bins
   tp = ns.tp
 
   if len(sys.argv) > 1 :
-    fastxFile = sys.argv[1]
+    fastaFile = sys.argv[1]
 
-  print '-File ' + fastxFile + ' has the following statistics:'
-  print 'Number of sequences          : %s' % comma_me(str(count_fasta(fastxFile)))
-  print 'Number of nucleotides        : %s' % comma_me(str(count_nucleotides(fastxFile)))
-  mn, mx = min_max_lengths(fastxFile)
+  print 'File "' + fastaFile + '" has the following statistics:'
+  print 'Number of sequences          : %s' % comma_me(str(count_fasta(fastaFile)))
+  print 'Number of nucleotides        : %s' % comma_me(str(count_nucleotides(fastaFile)))
+  mn, mx = min_max_lengths(fastaFile)
   print 'Longest Sequence             : %s' % comma_me(str(mx))
   print 'Shortest Sequence            : %s' % comma_me(str(mn))
-  mean, sd, median, cv = mean_sd_median_lengths(fastxFile)
+  mean, sd, median, cv = mean_sd_median_lengths(fastaFile)
   print 'Mean sequence length         : %.2f' % mean
   print 'STDV sequence length         : %.2f' % sd
-  print 'Median sequence length       : %s' % comma_me(str(median))
   print 'Variation of sequence length : %.2f' % cv
-  print 'N50 of the current file      : %s' % comma_me(str(calculate_N50(fastxFile)))
-  print 'Sequence length histogram!'
-  print_histogram(fastxFile, bins)
+  print 'Median sequence length       : %s' % comma_me(str(median))
+  print 'Mode of sequence length      : %s' % comma_me(str(mode(fastaFile)))
+  print 'N50 of the current file      : %s' % comma_me(str(calculate_N50(fastaFile)))
+  print '-Sequence length histogram:'
+  print_histogram(fastaFile, bins)
 
