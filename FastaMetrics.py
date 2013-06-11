@@ -13,7 +13,7 @@ Works as a script if it is called by its name.
 transform and change the source code presuming the apropriate reference and
 the lisence is kept free.
 @license: GNU GPL3 or newer.
-@contact: U{Costas Bouyioukos<mailto:k.bouyioukos@uea.ac.uk>}
+@contact: U{Costas Bouyioukos<mailto:cbouyio@gmail.com>}
 @version: 0.0.1
 """
 
