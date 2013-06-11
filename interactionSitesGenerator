@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+
+# A python script to generate an interaction file according to a user input.
+# Developed by C. Bouyioukos @iSSB, Paris, France, September 2012
+
+import argparse
+import math
+import random
+import string
+
+# Instantiate the command line parameters parser.
+cmdParser = argparse.ArgumentParser(description="A python script for the automatic generation of interaction files (J files) that can be used in the folding software.")
+# Construct individual arguments.
+cmdParser.add_argument('-b', '--baseFilename', type = str, metavar = '<base_file_name>', help = 'The base name for the interaction file(s). (Default "jFile")', dest = 'baseFilename', default = "jFile")
+cmdParser.add_argument('-c', '--chromosomes', type = int, metavar = '<number_of_chromosomes>', help = 'The number of chromosomes. (Default 1)', dest = 'chromosomes', default = 1)
+cmdParser.add_argument('-f', '--families', type = int, metavar = '<number_of_interaction_families>', help = 'The number of different interaction site families. (Default 1)', dest = 'families', default = 1)
+cmdParser.add_argument('-g', '--genome-size', type = int, metavar = '<size_of_the_genome>', required = True, help = 'The size of the genome in bp. (Compulsory)', dest = 'genomeSize')
+cmdParser.add_argument('-i', '--interactions', type = int, metavar = '<number_of_interacting_sites>', required = False, help = 'The number of interacting sites.', dest = 'interactions', default = None)
+cmdParser.add_argument('-n', '--null-model', action = 'store_true', required = False, help = 'Flag to initiate the null model, i.e. the non periodic arrangement of interaction sites. (Default OFF)', dest = 'nullModel', default = False)
+cmdParser.add_argument('-m', '--interaction-matrix', metavar = '<adj_matrix_file>', required = False, help = 'An adjacency matrix specifying interactions between sites. (Default "None")', dest = 'adjMatrix', default = None)
+cmdParser.add_argument('-o', '--order', type = str, metavar = '<ordering_style_of_families>', help = 'The ordering type of the interaction families: "inter" for interleaving ordering of te type (A, B, C, A, B, C...) or "cluster" for 1D-clustering of the sites (A, A, A, ..., B, B, B). (Default = "cluster")', dest = 'order', default = "cluster")
+cmdParser.add_argument('-p', '--period', type = int, metavar = '<period_of_interacting_sites>', required = False, help = 'The period (distance in bp) between interacting sites.', dest = 'period', default = None)
+cmdParser.add_argument('-r', '--rnd-seed', type = int, metavar = '<rnd_seed>', required = False, help = 'the seed for the random number generator. (Default 1)', dest = 'rndSeed', default = 1)
+cmdParser.add_argument('-s', '--strengths', type = float, metavar = '<strengths_of_interactions>', help = 'The energy of interactions (in KbT). (Default -5.0)', dest = 'strengths', default = -6.0)
+
+# Generate the arguments list namespace.
+ns = cmdParser.parse_args()
+
+# TODO Parameters compatibility checking
+
+
+def generate_interval_string(current, interval, interactions) :
+  """Function to generate the interaction intervals string.
+  """
+  # Initialise the intervals string
+  intervalStr = str(current)
+  # Generate the intervals string
+  for j in xrange(interactions - 1):
+    intervalStr = intervalStr + "\t" + str(current + interval)
+    current += interval
+  return(intervalStr)
+
+# Main program
+for i in xrange(ns.chromosomes):
+  if ns.interactions and ns.period == None:
+    # Calculate the regular intervals.
+    interval = int(math.ceil(ns.genomeSize / float(ns.interactions + 1)))
+    # No of interactions are the specified interactions
+    interactions = ns.interactions
+  elif ns.period and ns.interactions == None:
+    # Regular intervals are the period
+    interval = ns.period
+    # Calculate the number of interactions
+    interactions =  int(math.floor((ns.genomeSize - ns.period + 1) / float(ns.period)))
+  elif ns.period and ns.interactions:
+    # Regular intervals are the period
+    interval = ns.period
+    # No of interactions are the specified interactions
+    interactions = ns.interactions
+  else :
+    raise StandardError, "Specify either the number of interactions or the required period (or both)"
+  # Careful with the calculation of the first interaction site position.
+  start = int(math.floor((ns.genomeSize - interval * (interactions - 1)) / 2.0))
+  # Setup the output file(s)
+  if ns.nullModel :
+    interval = 'Rnd%0.4i' % ns.rndSeed
+    rng = random.Random(ns.rndSeed) # Initialise the RNG object
+  outFile = open(ns.baseFilename + "_in" + str(interactions) + "_p" + str(interval) + "_G" + str(ns.genomeSize) + ".txt", "w")
+  # Start writing the outfile
+  outFile.write("%i\n" % i)
+  outFile.write("################\n")
+  # Generate the intervals string.
+  if ns.nullModel :
+    intervalStr = ""
+    intSites = [rng.random() for site in xrange(interactions)]
+    intSites = [int(math.floor(x * ns.genomeSize)) for x in intSites]
+    intSites.sort()
+    for site in intSites :
+      intervalStr = intervalStr + str(site) + "\t"
+    string.rstrip(intervalStr)
+  else :
+    intervalStr = generate_interval_string(start, interval, interactions)
+  # One write call sorts out all the different cases!
+  outFile.write("%s\n" % intervalStr)
+  outFile.write("################\n")
+  # Generate the families string.
+  familiesStr = ""
+  familiesList = [x + 1 for x in range(ns.families)]
+  familiesRange = interactions / float(ns.families)
+  for k in xrange(interactions):
+    # Treat the two different ordering cases
+    if ns.order == "cluster":
+      familiesStr += "%i\t" % (int(math.floor((k / float(interactions)) * ns.families)) + 1) # Generate 1D-clustering ordering of families.
+    else:
+      mod = k  % ns.families # Modulo families!
+      familiesStr += '%i\t' % familiesList[mod] # Generate interleaving ordering of families.
+  outFile.write("%s\n" % familiesStr.rstrip())
+  outFile.write("################\n")
+  # Generate the interation potentials table.
+  interTableStr = ""
+  # Simplified way to constrict the interactions strengths string based on the families strinfg.
+  for i in xrange(interactions):
+    strengthsList = interactions * [ns.strengths]
+    strengthsList[i] = 0
+    for j in xrange(interactions):
+      if int(familiesStr.split()[i]) == int(familiesStr.split()[j]):
+        interTableStr = interTableStr + str(strengthsList[j]) + "\t"
+      else :
+        interTableStr = interTableStr + str(0.0) + "\t"
+## Obsolete.
+#    mod_i = i % ns.families
+#    for j in xrange(interactions) :
+#      mod_j = j % ns.families
+#      if i != j and mod_i == mod_j :
+#        interTableStr = interTableStr + str(strengthsList[j]) + "\t"
+#      else :
+#        interTableStr = interTableStr + str(0.0) + "\t"
+    interTableStr = interTableStr.rstrip() + "\n"
+  outFile.write(interTableStr)
+  outFile.write("################\n")
