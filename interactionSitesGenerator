@@ -44,14 +44,14 @@ def generate_interval_string(current, interval, interactions) :
 for i in xrange(ns.chromosomes):
   if ns.interactions and ns.period == None:
     # Calculate the regular intervals.
-    interval = int(math.ceil(ns.genomeSize / float(ns.interactions + 1)))
+    interval = int(math.floor((ns.genomeSize + 1)/ float(ns.interactions)))
     # No of interactions are the specified interactions
     interactions = ns.interactions
   elif ns.period and ns.interactions == None:
     # Regular intervals are the period
     interval = ns.period
     # Calculate the number of interactions
-    interactions =  int(math.floor((ns.genomeSize - ns.period + 1) / float(ns.period)))
+    interactions =  int(math.floor((ns.genomeSize + 1) / float(ns.period)))
   elif ns.period and ns.interactions:
     # Regular intervals are the period
     interval = ns.period
