@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+# -*- coding: UTF-8 -*-
+"""Calculate feature's Table from a fasta file with the appropriate header.
+
+Authors: Costas Bouyioukos
+mail: cbouyio@gmail.com
+Oct 2018
+UMR7216 Paris Diderot"""
+
+__version__ = "0.1a01"
+
+import argparse
+import pandas as pd
