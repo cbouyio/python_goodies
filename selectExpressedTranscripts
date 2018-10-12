@@ -11,3 +11,58 @@ __version__ = "0.1a01"
 
 import argparse
 import pandas as pd
+import numpy as np
+
+parser = argparse.ArgumentParser(prog='selectExpressedTranscripts', description='Select only the trancribed mRNA isoforms from a list of idoform expression percentages (or other proxy expression values).', epilog="Written by: Costas Bouyioukos, 2018")
+parser.add_argument('infile', type=argparse.FileType('r'), metavar="input_file", help='Path of a table file contaning a gene_id column a transcript_id column and at least three columns with transcription values.')
+parser.add_argument("outfile", nargs='?', default='-', type=argparse.FileType('w'), metavar='output_file', help="Path of the output list of transcript_ids file. (or STDOUT)")
+#TODO include 3 as an argument.
+
+
+args = parser.parse_args()
+
+# read the data to a pandas data frame.
+df = pd.read_table(args.infile)
+# Remove lines with all expression equals zero. (invariant of the number of columns of the DF.)
+df = df.loc[(df != 0).sum(axis=1) > 2]
+
+# Generate gene->transcript dictionary.
+geneTranscripts = {}
+
+# Get a list of gene_id - transcript_id tuples.
+gtIDs =  list(zip(df["gene_id"], df["transcript_id"]))
+
+# Set the index of df to be the transcript_id
+df = df.set_index('transcript_id')
+
+# populate the dict.
+for gt in gtIDs :
+    if gt[0] not in geneTranscripts :
+        geneTranscripts[gt[0]] = []
+    geneTranscripts[gt[0]].append(gt[1])
+
+# The returned expressed transcripts.
+expessedTranscripts = []
+
+# Collect the mean transcript expression.
+trExpresion = {}
+dft = df.loc[:, df.dtypes == np.float64] # temp df with only the numerical values.
+dft = dft.mean(axis=1) # DF with the mean expression values.
+
+# Main selection condition.
+for gene in geneTranscripts:
+    trs = geneTranscripts[gene]
+    # If there is a single transcript put it in the list directly.
+    if len(trs) == 1:
+        expessedTranscripts.append(trs[0])
+    else:
+        # Get the slice of the df containing the gene transcripts.
+        trsExpr = dft[dft.index.isin(trs)].sort_values(ascending=False)
+        # Here is the real condition.
+        expessedTranscripts.append(trsExpr.index[0])
+        maxExpr = trsExpr.ix[0,]
+        exprList = list(trsExpr[trsExpr > maxExpr/3.0].index) #THIS is the real condition.
+        # Append all the expressed elements in to the expressed list.
+        expessedTranscripts.extend(exprList)
+
+print(len(expessedTranscripts))
