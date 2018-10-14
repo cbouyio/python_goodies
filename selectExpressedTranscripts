@@ -16,8 +16,7 @@ import numpy as np
 parser = argparse.ArgumentParser(prog='selectExpressedTranscripts', description='Select only the trancribed mRNA isoforms from a list of idoform expression percentages (or other proxy expression values).', epilog="Written by: Costas Bouyioukos, 2018")
 parser.add_argument('infile', type=argparse.FileType('r'), metavar="input_file", help='Path of a table file contaning a gene_id column a transcript_id column and at least three columns with transcription values.')
 parser.add_argument("outfile", nargs='?', default='-', type=argparse.FileType('w'), metavar='output_file', help="Path of the output list of transcript_ids file. (or STDOUT)")
-#TODO include 3 as an argument.
-
+parser.add_argument('-f', '--fraction', type=int, default=3, help="The denominator of the fraction to divide the top expression level.")
 
 args = parser.parse_args()
 
@@ -35,34 +34,43 @@ gtIDs =  list(zip(df["gene_id"], df["transcript_id"]))
 # Set the index of df to be the transcript_id
 df = df.set_index('transcript_id')
 
-# populate the dict.
+# populate the dict gene - transcripts dict.
 for gt in gtIDs :
     if gt[0] not in geneTranscripts :
         geneTranscripts[gt[0]] = []
     geneTranscripts[gt[0]].append(gt[1])
 
 # The returned expressed transcripts.
-expessedTranscripts = []
+expressedTranscripts = []
 
 # Collect the mean transcript expression.
-trExpresion = {}
 dft = df.loc[:, df.dtypes == np.float64] # temp df with only the numerical values.
 dft = dft.mean(axis=1) # DF with the mean expression values.
 
-# Main selection condition.
+# Select the expressed transcripts.
 for gene in geneTranscripts:
+#    expressedTranscripts.append(("-" +str(gene), 0))
     trs = geneTranscripts[gene]
     # If there is a single transcript put it in the list directly.
     if len(trs) == 1:
-        expessedTranscripts.append(trs[0])
+        topTr = trs[0]
+        expressedTranscripts.append((topTr, dft.loc[topTr,]))
     else:
-        # Get the slice of the df containing the gene transcripts.
+        # Get the slice of the df containing the gene transcripts and sort them by percentage.
         trsExpr = dft[dft.index.isin(trs)].sort_values(ascending=False)
-        # Here is the real condition.
-        expessedTranscripts.append(trsExpr.index[0])
-        maxExpr = trsExpr.ix[0,]
-        exprList = list(trsExpr[trsExpr > maxExpr/3.0].index) #THIS is the real condition.
+        # Always include the top transcript and remove it from the restself.
+        maxExpr = trsExpr.iloc[0,]
+        expressedTranscripts.append((trsExpr.index[0], maxExpr))
+        trsExpr2 = trsExpr.drop(trsExpr.index[0])
+        if maxExpr > 40.0:
+#            expressedTranscripts.append("Max: " + str(maxExpr))
+            exprList = list(zip(trsExpr2[trsExpr2 > maxExpr / 3.0].index, trsExpr2[trsExpr2 > maxExpr / 3.0]))  #THIS is the homemade condition.
+        else:
+            exprLim = trsExpr.median(axis=0) + 3 * trsExpr.mad(axis=0)
+#            expressedTranscripts.append("Lim: " + str(exprLim))
+            exprList = list(zip(trsExpr2[trsExpr2 > exprLim].index, trsExpr2[trsExpr2 >= exprLim]))  #THIS is the real condition with MAD.
         # Append all the expressed elements in to the expressed list.
-        expessedTranscripts.extend(exprList)
+        expressedTranscripts.extend(exprList)
 
-print(len(expessedTranscripts))
+for g in expressedTranscripts:
+    print("{}\t{:.2f}".format(g[0], g[1]), file=args.outfile)
