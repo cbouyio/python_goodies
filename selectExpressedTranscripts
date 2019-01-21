@@ -58,19 +58,23 @@ for gene in geneTranscripts:
     else:
         # Get the slice of the df containing the gene transcripts and sort them by percentage.
         trsExpr = dft[dft.index.isin(trs)].sort_values(ascending=False)
-        # Always include the top transcript and remove it from the restself.
-        maxExpr = trsExpr.iloc[0,]
-        expressedTranscripts.append((trsExpr.index[0], gene, maxExpr))
-        trsExpr2 = trsExpr.drop(trsExpr.index[0])
-        if maxExpr > 40.0:
-#            expressedTranscripts.append("Max: " + str(maxExpr))
-            exprList = list(zip(trsExpr2[trsExpr2 > maxExpr / 3.0].index, [gene], trsExpr2[trsExpr2 > maxExpr / 3.0]))  #THIS is the homemade condition.
-        else:
-            exprLim = trsExpr.median(axis=0) + 3 * trsExpr.mad(axis=0)
-#            expressedTranscripts.append("Lim: " + str(exprLim))
-            exprList = list(zip(trsExpr2[trsExpr2 > exprLim].index, [gene], trsExpr2[trsExpr2 >= exprLim]))  #THIS is the real condition with MAD.
-        # Append all the expressed elements in to the expressed list.
-        expressedTranscripts.extend(exprList)
+        expressedTranscripts.append((trsExpr.index[0], gene, trsExpr.iat[0]))
+        expressedTranscripts.append((trsExpr.index[1], gene, trsExpr.iat[1]))
+## FIXME THIS is the proper condition and not the bullshit that Manuel is making me doing.
+#         # Always include the top transcript and remove it from the restself.
+#         maxExpr = trsExpr.iloc[0,]
+#         expressedTranscripts.append((trsExpr.index[0], gene, maxExpr))
+#         trsExpr2 = trsExpr.drop(trsExpr.index[0])
+#         if maxExpr > 40.0:
+# #            expressedTranscripts.append("Max: " + str(maxExpr))
+#             exprList = list(zip(trsExpr2[trsExpr2 > maxExpr / 3.0].index, [gene], trsExpr2[trsExpr2 > maxExpr / 3.0]))  #THIS is the homemade condition.
+#         else:
+#             exprLim = trsExpr.median(axis=0) + 3 * trsExpr.mad(axis=0)
+# #            expressedTranscripts.append("Lim: " + str(exprLim))
+#             exprList = list(zip(trsExpr2[trsExpr2 > exprLim].index, [gene], trsExpr2[trsExpr2 >= exprLim]))  #THIS is the real condition with MAD.
+#         # Append all the expressed elements in to the expressed list.
+#        expressedTranscripts.extend(exprList)
 
+# FIXME ALL this code should be converted to a module, included to the rna features extraction software and be collable with a name == __main__() construct.
 for g in expressedTranscripts:
     print("{}\t{}\t{:.2f}".format(g[0], g[1], g[2]), file=args.outfile)
