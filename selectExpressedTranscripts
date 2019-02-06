@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: UTF-8 -*-
+
 """Calculate feature's Table from a fasta file with the appropriate header.
 
 Authors: Costas Bouyioukos
@@ -9,31 +10,43 @@ UMR7216 Paris Diderot"""
 
 __version__ = "0.1a01"
 
+import sys
 import argparse
 import pandas as pd
 import numpy as np
 
-parser = argparse.ArgumentParser(prog='selectExpressedTranscripts', description='Select only the trancribed mRNA isoforms from a list of idoform expression percentages (or other proxy expression values).', epilog="Written by: Costas Bouyioukos, 2018")
-parser.add_argument('infile', type=argparse.FileType('r'), metavar="input_file", help='Path of a table file contaning a gene_id column a transcript_id column and at least three columns with transcription values.')
+parser = argparse.ArgumentParser(prog='selectExpressedTranscripts', description='Select only the trancribed mRNA isoforms from a list of isoform expression data (or other proxy expression values -percentages etc.-).FOR THE MOMENT IT TAKES ONLY PERCENTAGES', epilog="Written by: Costas Bouyioukos, 2018")
+# FIXME allow proper TPMs (or other GE values) as input also.
+parser.add_argument('infile', nargs='?', default='-', type=argparse.FileType('r'), metavar="input_file", help='Path of a table file contaning a gene_id column a transcript_id column and at least three columns with transcription values. (usually the output of RSEm or StringTie, or STDIN)')
 parser.add_argument("outfile", nargs='?', default='-', type=argparse.FileType('w'), metavar='output_file', help="Path of the output list of transcript_ids file. (or STDOUT)")
-parser.add_argument('-f', '--fraction', type=int, default=3, help="The denominator of the fraction to divide the top expression level.")
+parser.add_argument('-f', '--fraction', type=int, default=3, help="The denominator of the fraction to divide the top expression level. NOT IN USE. Paremeters need to be revisited.")
 
 args = parser.parse_args()
 
 # read the data to a pandas data frame.
 df = pd.read_table(args.infile)
-# Remove lines with all expression equals zero. (invariant of the number of columns of the DF.)
-df = df.loc[(df != 0).sum(axis=1) > 2]
-
-# Generate gene->transcript dictionary.
-geneTranscripts = {}
-
-# Get a list of gene_id - transcript_id tuples.
-gtIDs =  list(zip(df["gene_id"], df["transcript_id"]))
+# Remove lines with zero expression to half of the columns. (invariant of the number of columns of the DF.)
+df = df.loc[(df != 0).sum(axis=1) >= df.shape[1]/2]
 
 # Set the index of df to be the transcript_id
 df = df.set_index('transcript_id')
 
+# Collect the mean transcript expression.
+dft = df.loc[:, df.dtypes == np.float64] # temp df with only the numerical values.
+dft = dft.mean(axis=1) # DF with the mean expression values.
+# Remove transcripts with mean expression less than 10%
+# FIXME put the percentage/TPM as a command line parameter.
+dft = dft.loc[dft >= 10.0]
+
+# Slice the df with the new index
+df = df.ix[dft.index]
+
+# Reset the index to populate the dictionary.
+df.reset_index(level=0, inplace=True)
+# Get a list of gene_id - transcript_id tuples.
+gtIDs =  list(zip(df["gene_id"], df["transcript_id"]))
+# Generate gene->transcript dictionary.
+geneTranscripts = {}
 # populate the dict gene - transcripts dict.
 for gt in gtIDs :
     if gt[0] not in geneTranscripts :
@@ -42,10 +55,6 @@ for gt in gtIDs :
 
 # The returned expressed transcripts.
 expressedTranscripts = []
-
-# Collect the mean transcript expression.
-dft = df.loc[:, df.dtypes == np.float64] # temp df with only the numerical values.
-dft = dft.mean(axis=1) # DF with the mean expression values.
 
 # Select the expressed transcripts.
 for gene in geneTranscripts:
@@ -58,10 +67,10 @@ for gene in geneTranscripts:
     else:
         # Get the slice of the df containing the gene transcripts and sort them by percentage.
         trsExpr = dft[dft.index.isin(trs)].sort_values(ascending=False)
+        # FIXME The condition here takes ONLY the top expressed transcript per gene.
         expressedTranscripts.append((trsExpr.index[0], gene, trsExpr.iat[0]))
-        expressedTranscripts.append((trsExpr.index[1], gene, trsExpr.iat[1]))
-## FIXME THIS is the proper condition and not the bullshit that Manuel is making me doing.
-#         # Always include the top transcript and remove it from the restself.
+#         #expressedTranscripts.append((trsExpr.index[1], gene, trsExpr.iat[1]))
+#         # FIXME THIS is a proper condition # Always include the top transcript and remove it from the rest.
 #         maxExpr = trsExpr.iloc[0,]
 #         expressedTranscripts.append((trsExpr.index[0], gene, maxExpr))
 #         trsExpr2 = trsExpr.drop(trsExpr.index[0])
@@ -73,8 +82,10 @@ for gene in geneTranscripts:
 # #            expressedTranscripts.append("Lim: " + str(exprLim))
 #             exprList = list(zip(trsExpr2[trsExpr2 > exprLim].index, [gene], trsExpr2[trsExpr2 >= exprLim]))  #THIS is the real condition with MAD.
 #         # Append all the expressed elements in to the expressed list.
-#        expressedTranscripts.extend(exprList)
+#         expressedTranscripts.extend(exprList)
+
 
 # FIXME ALL this code should be converted to a module, included to the rna features extraction software and be collable with a name == __main__() construct.
+print("The tool reports ONLY the top expressed transcript per gene.", file=sys.stderr)
 for g in expressedTranscripts:
     print("{}\t{}\t{:.2f}".format(g[0], g[1], g[2]), file=args.outfile)
