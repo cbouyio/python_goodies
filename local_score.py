@@ -2,14 +2,18 @@
 
 """A python tool to calculate local score of DNA/RNA sequences."""
 
-
-def local_score(sequence, scoring):
+def local_score(sequence, scoring, n):
     """Main recursive function to calculate local score.
 
     sequence: A sequence of symbols (i.e string)
     scoring : A scoring scheme (i.e. a dictionary of symbols -> scores)
+    n       : A number specifying if we need to clip the sequence.
     return: A list of the local score
     """
+    # First clip the sequences if it is necessary
+    if (n):
+        if (len(sequence) > n):
+            sequence = sequence[:n]
     local_scores = [0.0]  # Initial local score is zero by definition.
     for symbol in sequence:
         try:
@@ -28,7 +32,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='localScore', description='Calculate and prints the local score of biosequences.', epilog="Author: Costas Bouyioukos, 2018")
     parser.add_argument('infile', nargs='?', default='-', type=argparse.FileType('r'), metavar="input_file", help='Path to a fasta DNA/RNA/protein file. (or STDIN)')
     parser.add_argument("outfile", nargs='?', default='-', type=argparse.FileType('w'), metavar='output_file', help="Path for the results file. (or STDOUT)")
+    parser.add_argument('-n', '--first-n', type=int, help="Clip only the first 'n' nulcotides for analysis.", dest='nb', default=None)
     parser.add_argument('-s', '--scoring', type=str, help='A scoring system file (a whitespace separated file with nucl./aa. first column and score as seconf)). Default: a hardcoded SCORING_DNA dictionary for GC richness.', dest='scr')
+    parser.add_argument('-v', '--verbose', action='store_true', help="A flag to print all the information about the sequence and the score. (Default = False, prints only the ID and the maximum score.)")
     optArgs = parser.parse_args()
 
     # Choose the scoring functionself.
@@ -44,9 +50,12 @@ if __name__ == '__main__':
                    "C" : 1.0,
                    "G" : 1.0,
                    "T" : -1.0}
-                   
+
     # Iterate over all fasta sequences.
     for seq in SeqIO.parse(optArgs.infile, "fasta"):
-        ls = local_score(seq.seq, SCORING)
-        optArgs.outfile.write("ID: {}  LS_max: {}\nSeq: {}\nScore: {}".format(seq.id, max(ls), seq.seq, ' '.join(map(str, ls))))
-    optArgs.outfile.write("\n")
+        ls = local_score(seq.seq, SCORING, optArgs.nb)
+        if (optArgs.verbose):
+            optArgs.outfile.write("ID: {} LS_max: {}\nSeq: {}\nScore: {}\n".format(seq.id, max(ls), seq.seq, ' '.join(map(str, ls))))
+        else:
+            optArgs.outfile.write("ID: {} LS_max: {}\n".format(seq.id, max(ls)))
+    #optArgs.outfile.write("\n")
