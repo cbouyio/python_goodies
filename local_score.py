@@ -10,7 +10,7 @@ def local_score(sequence, scoring, n):
     n       : A number specifying if we need to clip the sequence.
     return: A list of the local score
     """
-    # First clip the sequences if it is necessary
+    # First clip the sequences if it is specified.
     if (n):
         if (len(sequence) > n):
             sequence = sequence[:n]
@@ -45,11 +45,12 @@ if __name__ == '__main__':
                 (key, val) = line.split()
                 SCORING[key] = float(val)
     else:
-        # By default the local score finds GC reach regions.
+        # By default the local score finds GC rich regions.
         SCORING = {"A" : -1.0,
                    "C" : 1.0,
                    "G" : 1.0,
-                   "T" : -1.0}
+                   "T" : -1.0,
+                   "N" : 0}
 
     # Iterate over all fasta sequences.
     for seq in SeqIO.parse(optArgs.infile, "fasta"):
