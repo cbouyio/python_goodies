@@ -1,48 +1,81 @@
-#!/usr/env ptynon
-"""A python module to calculate CAI (Codon Adaptation Index) from a fasta file.
+#!/usr/bin/env python3
+"""A python tool module that exends with some functionalities the CodonUsage module of BioPython and provides interface to calculate CAI (Codon Adaptation Index) from a fasta file.
+
+Runs as a command line application, or can be imported as a module.
 
 Author: Costas Bouyioukos, @UMR7216, 2019
 """
 
+# TODO develope it as a biopython extension to calculate and update the CAI indexices from direct connection to ENSEMBL.! An interesting addition.
+
 import argparse
+import json
+import datetime
+import pandas as pd
 from Bio import SeqIO
 from Bio.SeqUtils import GC
 from Bio.SeqUtils import CodonUsage
 
-# Taken from https://www.kazusa.or.jp/codon/cgi-bin/showcodon.cgi?species=4932
-CodonsDictYeast = {'TTT': 170666, 'TTC': 120510, 'TTA': 170884, 'TTG': 177573,
-                   'CTT': 80076, 'CTC': 35545, 'CTA': 87619, 'CTG': 68494,
-                   'ATT': 196893, 'ATC': 112176, 'ATA': 116254, 'ATG': 136805,
-                   'GTT': 144243, 'GTC': 76947, 'GTA': 76927, 'GTG': 70337,
-                   'TAT': 122728, 'TAC': 96596, 'TAA': 6913, 'TAG': 3312,
-                   'CAT': 89007, 'CAC': 50785, 'CAA': 178251, 'CAG': 79121,
-                   'AAT': 233124, 'AAC': 162199, 'AAA': 273618, 'AAG': 201361,
-                   'GAT': 245641, 'GAC': 132048, 'GAA': 297944, 'GAG': 125717,
-                   'TCT': 153557, 'TCC': 92923, 'TCA': 122028, 'TCG': 55951,
-                   'CCT': 88263, 'CCC': 44309, 'CCA': 119641, 'CCG': 34597,
-                   'ACT': 132522, 'ACC': 83207, 'ACA': 116084, 'ACG': 52045,
-                   'GCT': 138358, 'GCC': 82357, 'GCA': 105910, 'GCG': 40358,
-                   'TGT': 52903, 'TGC': 31095, 'TGA': 4447, 'TGG': 67789,
-                   'CGT': 41791, 'CGC': 16993, 'CGA': 19562, 'CGG': 11351,
-                   'AGT': 92466, 'AGC': 63726, 'AGA': 139081, 'AGG': 60289,
-                   'GGT': 156109, 'GGC': 63903, 'GGA': 71216, 'GGG': 39359}
-
 CurrentCodonIndex = {}
 
+def generate_codon_dict_fasta(fasta_file):
+    """Calculate a codon counts dictionary from a fasta file.
 
-def generate_index(codon_dict):
-    """Generate a codon usage index from a FASTA file of CDS sequences.
+    Return the dict.
+    """
+    codon_counts = {'TTT': 0, 'TTC': 0, 'TTA': 0, 'TTG': 0,
+                    'CTT': 0, 'CTC': 0, 'CTA': 0, 'CTG': 0,
+                    'ATT': 0, 'ATC': 0, 'ATA': 0, 'ATG': 0,
+                    'GTT': 0, 'GTC': 0, 'GTA': 0, 'GTG': 0,
+                    'TAT': 0, 'TAC': 0, 'TAA': 0, 'TAG': 0,
+                    'CAT': 0, 'CAC': 0, 'CAA': 0, 'CAG': 0,
+                    'AAT': 0, 'AAC': 0, 'AAA': 0, 'AAG': 0,
+                    'GAT': 0, 'GAC': 0, 'GAA': 0, 'GAG': 0,
+                    'TCT': 0, 'TCC': 0, 'TCA': 0, 'TCG': 0,
+                    'CCT': 0, 'CCC': 0, 'CCA': 0, 'CCG': 0,
+                    'ACT': 0, 'ACC': 0, 'ACA': 0, 'ACG': 0,
+                    'GCT': 0, 'GCC': 0, 'GCA': 0, 'GCG': 0,
+                    'TGT': 0, 'TGC': 0, 'TGA': 0, 'TGG': 0,
+                    'CGT': 0, 'CGC': 0, 'CGA': 0, 'CGG': 0,
+                    'AGT': 0, 'AGC': 0, 'AGA': 0, 'AGG': 0,
+                    'GGT': 0, 'GGC': 0, 'GGA': 0, 'GGG': 0}
+    with fasta_file as fh:
+        for rec in SeqIO.parse(fh, "fasta"):
+            if len(rec.seq) < 60:
+                continue;
+            # make all UPPERcase.
+            if str(rec.seq).islower():
+                dna_seq = str(rec.seq).upper()
+            else:
+                dna_seq = str(rec.seq)
+            for i in range(0, len(dna_seq), 3):
+                codon = dna_seq[i:i+3]
+                if codon in codon_counts:
+                    codon_counts[codon] += 1
+                elif len(codon) < 3:
+                    pass
+                elif "N" in codon:
+                    pass
+                else:
+                    raise TypeError("Illegal codon {} in gene: {}".format(codon, rec.id))
+    with open("codon_counts_" + datetime.datetime.now().strftime('%Y%m%d_%H%M%S') + ".json", "w") as js:
+        json.dump(codon_counts, js)
+    return codon_counts
 
-    Take a codon usage dictionary and calculate the codon index in the CurrentCodonIndex module constant.
+
+def generate_index_dict(codon_dict):
+    """Generate a codon usage index from a codon usage dictionary.
+
+    Calculate the codon index as the CurrentCodonIndex module constant.
 
     RCSU values.
     """
     # TODO ABSOLUTELY INCORPORATE ALL THIS IN BIOPYTHON.
     #To calculate the index we first need to sum the number of times synonymous codons were used all together.
-    for aa in SynonymousCodons:
+    for aa in CodonUsage.SynonymousCodons:
         total = 0.0
         # RCSU values are CodonCount/((1/num of synonymous codons) * sum of all synonymous codons)
-        codons = SynonymousCodons[aa]
+        codons = CodonUsage.SynonymousCodons[aa]
         for codon in codons:
             total += codon_dict[codon]
         # calculate the RSCU value for each of the codons
@@ -56,12 +89,12 @@ def generate_index(codon_dict):
             CurrentCodonIndex[codon] = rcsu[codon_index] / rcsu_max
 
 
-def calculate_CAI(file, cdi):
+def calculate_CAI(file, cci=CurrentCodonIndex):
     """Calculate the Codon Adaptation Index from a FASTA file.
     """
     caidf = pd.DataFrame(columns=["CAI"])
     SeqCai = CodonUsage.CodonAdaptationIndex()
-    SeqCai.set_cai_index(cdi)
+    SeqCai.set_cai_index(cci)
     for seq in SeqIO.parse(file, "fasta"):
         cai = SeqCai.cai_for_gene(str(seq.seq))
         idt = seq.id
@@ -69,20 +102,32 @@ def calculate_CAI(file, cdi):
     return caidf
 
 
-if name = __main():
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='biopython_CAI.py', description='Fetch transcript features (sequence and data) from ENSEMBL, for each gene ID in a list and output a multi FASTA file.', epilog="Author: Costas Bouyioukos, 2019, Paris UMR7216.")
     parser.add_argument('infile', nargs='?', default='-', type=argparse.FileType('r'), metavar="input_file", help='Path to the input FASTA file. (or STDIN).')
     parser.add_argument("outfile", nargs='?', default='-', type=argparse.FileType('w'), metavar='output_file', help="Path to output table file. (or STDOUT).")
-    # TODO include an option with the codon usage table.
+    codon_counts = parser.add_mutually_exclusive_group(required=True)
+    codon_counts.add_argument('-o', '--orfs', nargs = "?", help="Path to a FASTA file contianing all ORFs that we need to calculate CAI for a new organism. (Default=None).", type=argparse.FileType('r'), default=None, dest="orfs", metavar="ORFsFile")
+    codon_counts.add_argument('-j', '--jsonFile', nargs = "?", help="Path to a JSON file containing the dictionary of codon counts for a known organism. (Default=None).", type=argparse.FileType('r'), default=None, dest="jscd", metavar="CountsJSON")
 
     # Parse the command line arguments.
     optArgs = parser.parse_args()
 
-    # Generate the CA Index dictionary.
-    generate_index(CodonsDictYeast)
+    # Load or generate the codon counts.
+    if optArgs.orfs:
+        codon_counts = generate_codon_dict_fasta(optArgs.orfs)
+    elif optArgs.jscd:
+        codon_counts = json.load(optArgs.jscd)
 
+    # Generate the CAIndex dictionary.
+    generate_index_dict(codon_counts)
+
+    print(CurrentCodonIndex)
+
+    import sys
+    sys.exit()
     # Calculate the CAI pre gene.
-    pdCai = calculate_CAI(optArgs.infile, CurrentCodonIndex)
+    pdCai = calculate_CAI(optArgs.infile)
 
     # Print it to outfile.
-    pd.write.csv(pdCai, file = optArgs.outfile)
+    pdCai.to_csv(optArgs.outfile, sep = "\t")
